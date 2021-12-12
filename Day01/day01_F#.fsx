@@ -10,7 +10,7 @@ let submarineReport = File.ReadAllLines(Path.Combine(__SOURCE_DIRECTORY__, "inpu
 // create a list of occurences where a value was bigger than its predecessor (or not)
 let largerThanBefore = [for i = 0 to submarineReport.Length - 2 do yield submarineReport.[i] < submarineReport.[i + 1]]
 
-// Count how often a measurement was bigger than its predecessor
+// count how often a measurement was bigger than its predecessor
 let countsLarger = largerThanBefore |> List.fold (fun acc v -> if v then acc + 1 else acc) 0
 
 printfn "The depth measurement increased %i times." countsLarger
