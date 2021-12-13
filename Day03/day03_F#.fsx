@@ -7,22 +7,6 @@
 open System.IO
 open FSharpAux
 
-let exampleReport =
-    [|
-        [|0;0;1;0;0|]
-        [|1;1;1;1;0|]
-        [|1;0;1;1;0|]
-        [|1;0;1;1;1|]
-        [|1;0;1;0;1|]
-        [|0;1;1;1;1|]
-        [|0;0;1;1;1|]
-        [|1;1;1;0;0|]
-        [|1;0;0;0;0|]
-        [|1;1;0;0;1|]
-        [|0;0;0;1;0|]
-        [|0;1;0;1;0|]
-    |]
-
 // read file and transform it into an int 2D array
 let diagnosticReport = 
     File.ReadAllLines(Path.Combine(__SOURCE_DIRECTORY__, "input_day03.csv")) 
