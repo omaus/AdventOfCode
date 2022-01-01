@@ -113,7 +113,10 @@ let matchDrawnNumber drawnNumber bingoBoard =
         Board = 
             bingoBoard.Board
             |> Array2D.map (
-                fun bn -> if bn.Number = drawnNumber then {bn with Match = true} else bn
+                fun bn -> 
+                    if bn.Number = drawnNumber then 
+                        {bn with Match = true} 
+                    else bn
             )
     }
 
@@ -127,7 +130,8 @@ let isBingoInBoard (bingoBoard : BingoBoard) =
     // recursively looks for the first Bingo in a given board
     let rec isBingo bb i j check winningLine =
         if check then 
-            printfn "\nBINGO!\n"
+            printfn "\nBINGO!\n  on board %i with the number series: " bb.BoardNumber
+            winningLine |> Array.iteri (fun i n -> if i < 4 then printf " %i," n.Number else printfn " %i.\n" n.Number)
             check, {bb with HasWon = true; WinningLine = winningLine |> Array.map (fun bn -> bn.Number)} 
         elif i < rn - 1 then 
             let currentLine = bb.Board.[i,0 ..]
@@ -144,6 +148,13 @@ let isBingoInBoard (bingoBoard : BingoBoard) =
 let playBingo (bingoBoards : BingoBoard []) (numbersToDraw : int []) =
     printfn "" // empty line for better readability of printed output
     let rec loop bingoBoards2 currentNumber i listOfDrawnNumbers =
+        // print all drawn numbers first
+        if listOfDrawnNumbers = [] then printfn "Drawn number: %i" currentNumber
+        else 
+            printf "Drawn numbers: " 
+            List.rev listOfDrawnNumbers 
+            |> List.iter (printf "%i, ")
+            printfn "%i." currentNumber
         // update all boards by the current number
         let updatedBoards = bingoBoards2 |> Array.map (matchDrawnNumber currentNumber)
         // check if there's a Bingo on any board
@@ -151,42 +162,10 @@ let playBingo (bingoBoards : BingoBoard []) (numbersToDraw : int []) =
         // if already a Bingo occured then...
         if Array.exists (fst >> (=) true) boardsBingoChecked then
             // take all boards that have a Bingo at that point
-            let boardsWithBingo = Array.filter fst boardsBingoChecked
-            // if only 1 board wins then...
-            if boardsWithBingo.Length = 1 then 
-                let wonBoard = Array.head boardsWithBingo |> snd
-                printf "The Bingo board with the number %i won.\nWinning number series:" wonBoard.BoardNumber
-                wonBoard.WinningLine
-                |> Array.iteri (fun i n -> if i < 4 then printf " %i," n else printfn " %i.\n" n)
-                // return the output sequence
-                List.rev (numbersToDraw.[i] :: listOfDrawnNumbers), Array.singleton wonBoard
-            // if several boards win at the same time then...
-            else 
-                let wonBoards = Array.map snd boardsWithBingo
-                printf "The Bingo boards with the numbers "
-                wonBoards 
-                |> Array.iteri (
-                    fun i bb -> 
-                        if i < wonBoards.Length - 1 then 
-                            printf "%i, " bb.BoardNumber 
-                        else printfn "%i " bb.BoardNumber
-                )
-                printf "won.\nWinning number series:"
-                wonBoards 
-                |> Array.head
-                |> fun wb -> wb.WinningLine
-                |> Array.iteri (fun i n -> if i < 4 then printf " %i," n else printfn " %i." n)
-                List.rev (numbersToDraw.[i] :: listOfDrawnNumbers), wonBoards
+            let boardsWithBingo = Array.choose (fun bb -> if fst bb then Some (snd bb) else None) boardsBingoChecked
+            List.rev (numbersToDraw.[i] :: listOfDrawnNumbers), boardsWithBingo
         // no Bingo occured yet, go on and draw the next number
-        else
-            if listOfDrawnNumbers = [] then () else printf "Drawn numbers: " 
-            List.rev listOfDrawnNumbers 
-            |> List.iteri (
-                fun i n -> 
-                    if i = List.length listOfDrawnNumbers - 1 then printfn "%i." n
-                    else printf "%i, " n 
-            )
-            loop updatedBoards numbersToDraw.[i + 1] (i + 1) (numbersToDraw.[i] :: listOfDrawnNumbers)
+        else loop updatedBoards numbersToDraw.[i + 1] (i + 1) (numbersToDraw.[i] :: listOfDrawnNumbers)
     loop bingoBoards numbersToDraw.[0] 0 []
 
 let drawnNumbersExample, wonBoardsExample = playBingo exampleBingoBoards exampleNumbersDrawn
@@ -194,12 +173,16 @@ let drawnNumbers, wonBoards = playBingo bingoBoards bingoNumbersDrawn
 
 // does the final calculation (multiplying all unmarked board numbers with the last drawn number)
 let getFinalResult (bingoBoards : BingoBoard []) drawnNumbers =
+    printfn "drawnNumbers %A" drawnNumbers
     let lastDrawnNumber = List.last drawnNumbers
+    printfn "last drawn number: %i" lastDrawnNumber
     let sumOfUnmarkedNumbers = 
         (Array.head bingoBoards).Board
         |> Array2D.toLongColumnArray
         |> Array.choose (fun bn -> if not bn.Match then Some bn.Number else None)
+        |> fun x -> printfn "unmarked numbers %A" x; x
         |> Array.sum
+        |> fun x -> printfn "sum is %i" x; x
     lastDrawnNumber * sumOfUnmarkedNumbers
 
 getFinalResult wonBoardsExample drawnNumbersExample
@@ -213,42 +196,40 @@ getFinalResult wonBoards drawnNumbers
 let loseBingo (bingoBoards : BingoBoard []) (numbersToDraw : int []) =
     printfn ""
     let rec loop bingoBoards2 currentNumber i listOfDrawnNumbers winnerBoards =
+        if listOfDrawnNumbers = [] then printfn "Drawn number: %i." currentNumber
+        else 
+            printf "Drawn numbers: " 
+            List.rev listOfDrawnNumbers |> List.iter (printf "%i, ")
+        printfn "%i." currentNumber
         let updatedBoards = bingoBoards2 |> Array.map (matchDrawnNumber currentNumber)
         let boardsBingoChecked = updatedBoards |> Array.map isBingoInBoard
         // for every Bingo that occurs on a board and there are more than 1 un-Bingoed board left then...
         if Array.exists (fst >> (=) true) boardsBingoChecked && updatedBoards.Length > 1 then
-            let boardWithBingo = Array.find fst boardsBingoChecked
-            let wonBoard = snd boardWithBingo
+            let boardsWithBingo = boardsBingoChecked |> Array.choose (fun bb -> if fst bb then Some (snd bb) else None)
             let updatedBoardsWithoutWinner = 
                 boardsBingoChecked 
                 |> Array.choose (
                     fun bbc -> 
-                        if fst bbc |> not then
-                            Some (snd bbc)
+                        if fst bbc |> not then Some (snd bbc)
                         else None
                 )
-            printf "The Bingo board with the number %i won.\nWinning number series:" wonBoard.BoardNumber
-            wonBoard.WinningLine
-            |> Array.iteri (fun i n -> if i < 4 then printf " %i," n else printfn " %i.\n" n)
+            // boards won this round appended to the previously winning boards
+            let updatedWinnerBoards = boardsWithBingo |> Array.fold (fun wb bb -> bb :: wb) winnerBoards
             // return the output sequence
-            loop updatedBoardsWithoutWinner numbersToDraw.[i + 1] (i + 1) (numbersToDraw.[i] :: listOfDrawnNumbers) (wonBoard :: winnerBoards)
-        // if a Bingo occured on all boards then...
-        elif updatedBoards.Length = 1 && Array.head boardsBingoChecked |> fst then
-            List.rev (numbersToDraw.[i] :: listOfDrawnNumbers), Array.head updatedBoards :: winnerBoards
+            loop updatedBoardsWithoutWinner numbersToDraw.[i + 1] (i + 1) (numbersToDraw.[i] :: listOfDrawnNumbers) updatedWinnerBoards
+        // if a Bingo occured on the last remaining board then...
+        elif Array.exists (fst >> (=) true) boardsBingoChecked then
+            let boardWithBingo = (Array.head >> snd) boardsBingoChecked
+            List.rev (numbersToDraw.[i] :: listOfDrawnNumbers), boardWithBingo :: winnerBoards
         // no Bingo occured yet, go on and draw the next number
-        else
-            if listOfDrawnNumbers = [] then () else printf "Drawn numbers: " 
-            List.rev listOfDrawnNumbers 
-            |> List.iteri (
-                fun i n -> 
-                    if i = List.length listOfDrawnNumbers - 1 then printfn "%i." n
-                    else printf "%i, " n 
-            )
-            loop updatedBoards numbersToDraw.[i + 1] (i + 1) (numbersToDraw.[i] :: listOfDrawnNumbers) winnerBoards
+        else loop updatedBoards numbersToDraw.[i + 1] (i + 1) (numbersToDraw.[i] :: listOfDrawnNumbers) winnerBoards
     loop bingoBoards numbersToDraw.[0] 0 [] []
 
 let drawnNumbersExample2, wonBoardsExample2 = loseBingo exampleBingoBoards exampleNumbersDrawn
 let drawnNumbers2, wonBoards2 = loseBingo bingoBoards bingoNumbersDrawn
+
+wonBoards2.Length
+bingoBoards.Length
 
 getFinalResult (Array.ofList wonBoardsExample2) drawnNumbersExample2
 getFinalResult (Array.ofList wonBoards2) drawnNumbers2
