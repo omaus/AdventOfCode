@@ -53,13 +53,13 @@ let bingoReport = File.ReadAllLines(Path.Combine(__SOURCE_DIRECTORY__, "input_da
 // divide input file into different aspects. Here: the numbers drawn
 let bingoNumbersDrawn = Array.head bingoReport |> String.split ',' |> Array.map int
 
-// type for Bingo numbers
+// record for Bingo numbers
 type BingoNumber = {
     Number  : int
     Match   : bool
 }
 
-// type for Bingo boards
+// record for Bingo boards
 type BingoBoard = {
     Board       : BingoNumber [,]
     BoardNumber : int
@@ -132,16 +132,19 @@ let isBingoInBoard (bingoBoard : BingoBoard) =
         if check then 
             printfn "\nBINGO!\n  on board %i with the number series: " bb.BoardNumber
             winningLine |> Array.iteri (fun i n -> if i < 4 then printf " %i," n.Number else printfn " %i.\n" n.Number)
-            check, {bb with HasWon = true; WinningLine = winningLine |> Array.map (fun bn -> bn.Number)} 
-        elif i < rn - 1 then 
+            {bb with HasWon = true; WinningLine = winningLine |> Array.map (fun bn -> bn.Number)} 
+        // iterates through the rows
+        elif i < rn then 
             let currentLine = bb.Board.[i,0 ..]
             let newCheck = isBingoLine currentLine
             isBingo bb (i + 1) j newCheck currentLine
-        elif j < cn - 1 then
+        // iterates through the columns
+        elif j < cn then
             let currentLine = bb.Board.[0 ..,j]
             let newCheck = isBingoLine currentLine
             isBingo bb i (j + 1) newCheck currentLine
-        else check, bb
+        // iteration complete, no Bingo found
+        else bb
     isBingo bingoBoard 0 0 false [||]
 
 // function to play Bingo
@@ -160,9 +163,9 @@ let playBingo (bingoBoards : BingoBoard []) (numbersToDraw : int []) =
         // check if there's a Bingo on any board
         let boardsBingoChecked = updatedBoards |> Array.map isBingoInBoard
         // if already a Bingo occured then...
-        if Array.exists (fst >> (=) true) boardsBingoChecked then
+        if Array.exists (fun bb -> bb.HasWon) boardsBingoChecked then
             // take all boards that have a Bingo at that point
-            let boardsWithBingo = Array.choose (fun bb -> if fst bb then Some (snd bb) else None) boardsBingoChecked
+            let boardsWithBingo = Array.filter (fun bb -> bb.HasWon) boardsBingoChecked
             List.rev (numbersToDraw.[i] :: listOfDrawnNumbers), boardsWithBingo
         // no Bingo occured yet, go on and draw the next number
         else loop updatedBoards numbersToDraw.[i + 1] (i + 1) (numbersToDraw.[i] :: listOfDrawnNumbers)
@@ -192,7 +195,7 @@ getFinalResult wonBoards drawnNumbers
 // PART 2
 // ‾‾‾‾‾‾
 
-// function to get a list of the drawn cords in chronological order as well as a list of all Bingo boards, sorted anti-chronologically by win
+// function to get a list of the drawn numbers in chronological order as well as a list of all Bingo boards, sorted anti-chronologically by win
 let loseBingo (bingoBoards : BingoBoard []) (numbersToDraw : int []) =
     printfn ""
     let rec loop bingoBoards2 currentNumber i listOfDrawnNumbers winnerBoards =
@@ -200,26 +203,19 @@ let loseBingo (bingoBoards : BingoBoard []) (numbersToDraw : int []) =
         else 
             printf "Drawn numbers: " 
             List.rev listOfDrawnNumbers |> List.iter (printf "%i, ")
-        printfn "%i." currentNumber
+            printfn "%i." currentNumber
         let updatedBoards = bingoBoards2 |> Array.map (matchDrawnNumber currentNumber)
         let boardsBingoChecked = updatedBoards |> Array.map isBingoInBoard
-        // for every Bingo that occurs on a board and there are more than 1 un-Bingoed board left then...
-        if Array.exists (fst >> (=) true) boardsBingoChecked && updatedBoards.Length > 1 then
-            let boardsWithBingo = boardsBingoChecked |> Array.choose (fun bb -> if fst bb then Some (snd bb) else None)
-            let updatedBoardsWithoutWinner = 
-                boardsBingoChecked 
-                |> Array.choose (
-                    fun bbc -> 
-                        if fst bbc |> not then Some (snd bbc)
-                        else None
-                )
+        // for every Bingo that occurs on a board and there's more than 1 un-Bingoed board left then...
+        if Array.exists (fun bb -> bb.HasWon) boardsBingoChecked && updatedBoards.Length > 1 then
+            let boardsWithBingo = boardsBingoChecked |> Array.filter (fun bb -> bb.HasWon)
+            let updatedBoardsWithoutWinner = boardsBingoChecked |> Array.filter (fun bbc -> not bbc.HasWon)
             // boards won this round appended to the previously winning boards
             let updatedWinnerBoards = boardsWithBingo |> Array.fold (fun wb bb -> bb :: wb) winnerBoards
-            // return the output sequence
             loop updatedBoardsWithoutWinner numbersToDraw.[i + 1] (i + 1) (numbersToDraw.[i] :: listOfDrawnNumbers) updatedWinnerBoards
         // if a Bingo occured on the last remaining board then...
-        elif Array.exists (fst >> (=) true) boardsBingoChecked then
-            let boardWithBingo = (Array.head >> snd) boardsBingoChecked
+        elif Array.length updatedBoards = 1 && (Array.head boardsBingoChecked).HasWon then
+            let boardWithBingo = Array.head boardsBingoChecked
             List.rev (numbersToDraw.[i] :: listOfDrawnNumbers), boardWithBingo :: winnerBoards
         // no Bingo occured yet, go on and draw the next number
         else loop updatedBoards numbersToDraw.[i + 1] (i + 1) (numbersToDraw.[i] :: listOfDrawnNumbers) winnerBoards
@@ -227,9 +223,6 @@ let loseBingo (bingoBoards : BingoBoard []) (numbersToDraw : int []) =
 
 let drawnNumbersExample2, wonBoardsExample2 = loseBingo exampleBingoBoards exampleNumbersDrawn
 let drawnNumbers2, wonBoards2 = loseBingo bingoBoards bingoNumbersDrawn
-
-wonBoards2.Length
-bingoBoards.Length
 
 getFinalResult (Array.ofList wonBoardsExample2) drawnNumbersExample2
 getFinalResult (Array.ofList wonBoards2) drawnNumbers2
