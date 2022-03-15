@@ -1,3 +1,1 @@
-# AdventOfCode
-My tries of solving the Advent of Code puzzles.  
-https://adventofcode.com/
+(moved to collective repo: https://github.com/omaus/CodingProblems)
